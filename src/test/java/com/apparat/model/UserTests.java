@@ -23,7 +23,7 @@ class UserTests{
 
     @Test
     void shouldThrowExceptionWhenNameIsBlank() {
-        assertThrows(
+        IllegalArgumentException exception=assertThrows(
                 IllegalArgumentException.class,
                 () -> new User(
                         2,
@@ -31,6 +31,10 @@ class UserTests{
                         "bad@example.com",
                         Role.FACULTY
                 )
+        );
+        assertEquals(
+                "Name cannot be null or blank",
+                exception.getMessage()
         );
     }
 
