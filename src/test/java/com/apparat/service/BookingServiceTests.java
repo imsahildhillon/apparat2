@@ -7,6 +7,11 @@ import java.time.LocalDateTime;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.util.List;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+
 class BookingServiceTests {
 
     private final BookingService bookingService = new BookingService();
@@ -90,5 +95,100 @@ class BookingServiceTests {
         LocalDateTime end = LocalDateTime.of(2026, 10, 8, 18, 30);
 
         assertFalse(bookingService.isValidRange(start, end));
+    }
+
+    @Test
+    void oneHourBookingProducesTwoSlots() {
+        LocalDateTime start =
+                LocalDateTime.of(2026, 10, 21, 10, 0);
+        LocalDateTime end =
+                LocalDateTime.of(2026, 10, 21, 11, 0);
+
+        List<LocalDateTime> slots =
+                bookingService.generateSlots(start, end);
+
+        assertEquals(
+                List.of(
+                        LocalDateTime.of(2026, 10, 21, 10, 0),
+                        LocalDateTime.of(2026, 10, 21, 10, 30)
+                ),
+                slots
+        );
+    }
+
+    @Test
+    void thirtyMinuteBookingProducesOneSlot() {
+        LocalDateTime start =
+                LocalDateTime.of(2026, 10, 21, 10, 0);
+        LocalDateTime end =
+                LocalDateTime.of(2026, 10, 21, 10, 30);
+
+        List<LocalDateTime> slots =
+                bookingService.generateSlots(start, end);
+
+        assertEquals(
+                List.of(start),
+                slots
+        );
+    }
+
+    @Test
+    void misalignedBookingIsRejected() {
+        LocalDateTime start =
+                LocalDateTime.of(2026, 10, 21, 10, 10);
+        LocalDateTime end =
+                LocalDateTime.of(2026, 10, 21, 10, 40);
+
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> bookingService.generateSlots(start, end)
+        );
+    }
+    @Test
+    void bookingStartingAtClosingTimeIsRejected() {
+        LocalDateTime start =
+                LocalDateTime.of(2026, 10, 21, 18, 0);
+        LocalDateTime end =
+                LocalDateTime.of(2026, 10, 21, 18, 30);
+
+        assertFalse(bookingService.isValidRange(start, end));
+    }
+    @Test
+    void backToBackBookingsHaveNoSharedSlots() {
+        LocalDateTime firstStart =
+                LocalDateTime.of(2026, 10, 21, 10, 30);
+        LocalDateTime firstEnd =
+                LocalDateTime.of(2026, 10, 21, 11, 30);
+
+        LocalDateTime secondStart =
+                LocalDateTime.of(2026, 10, 21, 11, 30);
+        LocalDateTime secondEnd =
+                LocalDateTime.of(2026, 10, 21, 12, 0);
+
+        List<LocalDateTime> firstSlots =
+                bookingService.generateSlots(firstStart, firstEnd);
+
+        List<LocalDateTime> secondSlots =
+                bookingService.generateSlots(secondStart, secondEnd);
+
+        assertFalse(
+                firstSlots.stream().anyMatch(secondSlots::contains),
+                "Back-to-back bookings must not share a slot."
+        );
+
+        assertEquals(
+                List.of(
+                        LocalDateTime.of(2026, 10, 21, 10, 30),
+                        LocalDateTime.of(2026, 10, 21, 11, 0)
+                ),
+                firstSlots
+        );
+
+        assertEquals(
+                List.of(
+                        LocalDateTime.of(2026, 10, 21, 11, 30)
+                ),
+                secondSlots
+        );
     }
 }
