@@ -6,7 +6,7 @@ import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.time.LocalDateTime;
 
-public class BookingSlotDao {
+public class BookingSlotDao{
 
     public void insert(
             Connection connection,
@@ -51,4 +51,3 @@ public class BookingSlotDao {
         }
     }
 }
-

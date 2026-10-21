@@ -6,6 +6,23 @@ import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.List;
 
+
+import com.apparat.config.DatabaseConnection;
+import com.apparat.dao.BookingDao;
+import com.apparat.dao.BookingSlotDao;
+import com.apparat.dao.ResourceDao;
+import com.apparat.model.Booking;
+import com.apparat.model.BookingStatus;
+import com.apparat.model.Resource;
+import com.apparat.model.ResourceStatus;
+import com.apparat.service.SlotConflictException;
+
+import java.sql.Connection;
+import java.sql.SQLException;
+import java.util.Optional;
+
+
+
 public class BookingService {
 
     public static final LocalTime OPEN = LocalTime.of(9, 0);
@@ -84,5 +101,106 @@ public class BookingService {
         return slots;
     }
 
+
+    public Booking createBooking(
+            int userId,
+            int resourceId,
+            LocalDateTime start,
+            LocalDateTime end
+    ) throws SQLException {
+
+        // 1. Validate the booking time range.
+        if (!isValidRange(start, end)) {
+            throw new IllegalArgumentException(
+                    "Invalid booking time range."
+            );
+        }
+
+        // 2. Check that the resource exists and is ACTIVE.
+        ResourceDao resourceDao = new ResourceDao();
+
+        Optional<Resource> resourceOptional =
+                resourceDao.findById(resourceId);
+
+        if (resourceOptional.isEmpty()) {
+            throw new IllegalArgumentException(
+                    "Resource does not exist."
+            );
+        }
+
+        Resource resource = resourceOptional.get();
+
+        if (resource.getStatus() != ResourceStatus.ACTIVE) {
+            throw new IllegalStateException(
+                    "Resource is not active."
+            );
+        }
+
+        // 3. Create the booking and DAO objects.
+        BookingDao bookingDao = new BookingDao();
+        BookingSlotDao bookingSlotDao = new BookingSlotDao();
+
+        Booking booking = new Booking(
+                0,
+                userId,
+                resourceId,
+                start,
+                end,
+                BookingStatus.CONFIRMED
+        );
+
+        // 4. Open one connection and begin the transaction.
+        try (Connection connection =
+                     DatabaseConnection.getConnection()) {
+
+            connection.setAutoCommit(false);
+
+            try {
+                // 5. Insert the booking and retrieve its generated ID.
+                Booking savedBooking =
+                        bookingDao.insert(connection, booking);
+
+                // 6. Generate slots and insert them.
+                List<LocalDateTime> slots =
+                        generateSlots(start, end);
+
+                for (LocalDateTime slotStart : slots) {
+                    try {
+                        bookingSlotDao.insert(
+                                connection,
+                                resourceId,
+                                slotStart,
+                                savedBooking.getId()
+                        );
+                    } catch (SQLException e) {
+                        // Translate duplicate-key errors from slot insertion.
+                        if (e.getErrorCode() == 1062) {
+                            throw new SlotConflictException(
+                                    "One or more requested slots are already booked.",
+                                    e
+                            );
+                        }
+
+                        throw e;
+                    }
+                }
+
+                // 7. Commit only when every insert succeeds.
+                connection.commit();
+
+                return savedBooking;
+
+            } catch (SQLException | RuntimeException e) {
+                // Preserve the original error if rollback also fails.
+                try {
+                    connection.rollback();
+                } catch (SQLException rollbackException) {
+                    e.addSuppressed(rollbackException);
+                }
+
+                throw e;
+            }
+        }
+    }
 
 }
