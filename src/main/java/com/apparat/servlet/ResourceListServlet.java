@@ -1,3 +1,4 @@
+
 package com.apparat.servlet;
 
 import com.apparat.model.Resource;
@@ -30,6 +31,13 @@ public class ResourceListServlet extends HttpServlet {
                     resourceService.listResources();
 
             request.setAttribute("resources", resources);
+
+            // Display the confirmation after BookingServlet redirects here.
+            String bookedId = request.getParameter("booked");
+
+            if (bookedId != null && !bookedId.isBlank()) {
+                request.setAttribute("bookedId", bookedId);
+            }
 
             request.getRequestDispatcher(
                     "/WEB-INF/views/resources.jsp"
