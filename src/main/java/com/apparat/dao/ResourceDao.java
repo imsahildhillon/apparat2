@@ -1,3 +1,4 @@
+
 package com.apparat.dao;
 
 import com.apparat.config.DatabaseConnection;
@@ -20,8 +21,10 @@ public class ResourceDao {
         List<Resource> resources = new ArrayList<>();
 
         try (
-                Connection connection = DatabaseConnection.getConnection();
-                PreparedStatement statement = connection.prepareStatement(sql);
+                Connection connection =
+                        DatabaseConnection.getConnection();
+                PreparedStatement statement =
+                        connection.prepareStatement(sql);
                 ResultSet resultSet = statement.executeQuery()
         ) {
             while (resultSet.next()) {
@@ -35,13 +38,43 @@ public class ResourceDao {
 
     public Optional<Resource> findById(int id) throws SQLException {
         String sql = """
-            SELECT id, name, location, status
-            FROM resources
-            WHERE id = ?
-            """;
+                SELECT id, name, location, status
+                FROM resources
+                WHERE id = ?
+                """;
 
-        try (Connection connection = DatabaseConnection.getConnection();
-             PreparedStatement statement = connection.prepareStatement(sql)) {
+        try (
+                Connection connection =
+                        DatabaseConnection.getConnection();
+                PreparedStatement statement =
+                        connection.prepareStatement(sql)
+        ) {
+            statement.setInt(1, id);
+
+            try (ResultSet resultSet = statement.executeQuery()) {
+                if (resultSet.next()) {
+                    return Optional.of(mapRow(resultSet));
+                }
+
+                return Optional.empty();
+            }
+        }
+    }
+
+    public Optional<Resource> findByIdForUpdate(
+            Connection connection,
+            int id
+    ) throws SQLException {
+
+        String sql = """
+                SELECT id, name, location, status
+                FROM resources
+                WHERE id = ?
+                FOR UPDATE
+                """;
+
+        try (PreparedStatement statement =
+                     connection.prepareStatement(sql)) {
 
             statement.setInt(1, id);
 
@@ -60,7 +93,9 @@ public class ResourceDao {
                 resultSet.getInt("id"),
                 resultSet.getString("name"),
                 resultSet.getString("location"),
-                ResourceStatus.valueOf(resultSet.getString("status"))
+                ResourceStatus.valueOf(
+                        resultSet.getString("status")
+                )
         );
     }
 }

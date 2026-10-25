@@ -12,9 +12,9 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -50,15 +50,15 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * A and C can coexist; A and E can coexist; B and E can coexist.
  *
  * Prediction:
- * At most 2 distinct windows can succeed.
+ * At most two distinct windows can succeed.
  * Expected failures are mainly SlotConflictException.
- * Other SQL errors, including deadlock 1213, must be investigated.
+ * Deadlocks (MySQL error 1213) should be zero with FOR UPDATE.
  *
  * Invariants:
  * 1. Every successful booking has exactly duration / 30 slots.
  * 2. No booking on the test date has zero slots.
  * 3. No slot points to a missing booking.
- * 4. New slot rows equal the sum of expected slots for successful bookings.
+ * 4. New slot rows equal the expected slots for successful bookings.
  * 5. No resource-slot pair appears more than once.
  */
 
@@ -84,8 +84,11 @@ class BookingServiceStressTests {
     private final List<Integer> createdBookingIds =
             new ArrayList<>();
 
-    private record Window(String name, LocalDateTime start,
-                          LocalDateTime end) {}
+    private record Window(
+            String name,
+            LocalDateTime start,
+            LocalDateTime end
+    ) {}
 
     private record BookingResult(
             int bookingId,
@@ -127,6 +130,7 @@ class BookingServiceStressTests {
                 new CountDownLatch(1);
 
         AtomicInteger successes = new AtomicInteger();
+        AtomicInteger deadlocks = new AtomicInteger();
 
         Map<String, Integer> failures =
                 new ConcurrentHashMap<>();
@@ -172,6 +176,10 @@ class BookingServiceStressTests {
                         successes.incrementAndGet();
 
                     } catch (Exception e) {
+                        if (isDeadlock(e)) {
+                            deadlocks.incrementAndGet();
+                        }
+
                         failures.merge(
                                 e.getClass().getSimpleName(),
                                 1,
@@ -209,32 +217,53 @@ class BookingServiceStressTests {
             );
         }
 
-        System.out.println("Successful bookings: " + successes.get());
+        int successCount = successes.get();
+        int deadlockCount = deadlocks.get();
+
+        int failureCount = failures.values()
+                .stream()
+                .mapToInt(Integer::intValue)
+                .sum();
+
+        System.out.println("Total attempts: " + THREAD_COUNT);
+        System.out.println("Successful bookings: " + successCount);
         System.out.println("Failure types: " + failures);
+        System.out.println("Deadlocks (error 1213): " + deadlockCount);
         System.out.println("Successful windows: " + createdBookings);
 
-        // A maximum of two distinct windows can coexist.
+        // At most two distinct windows can coexist.
         assertTrue(
-                successes.get() <= 2,
+                successCount <= 2,
                 "More than two compatible windows were accepted."
         );
 
+        // At least one booking must succeed.
+        assertTrue(
+                successCount >= 1,
+                "At least one booking should succeed."
+        );
+
+        // All workers must succeed or record a failure.
         assertEquals(
                 THREAD_COUNT,
-                successes.get()
-                        + failures.values().stream()
-                        .mapToInt(Integer::intValue)
-                        .sum(),
+                successCount + failureCount,
                 "Every worker must succeed or record a failure."
         );
 
-        // Invariant 1 and 3: each successful booking has the
-        // correct number of slots, and its slots point to it.
+        // FOR UPDATE should prevent deadlocks in this test workload.
+        assertEquals(
+                0,
+                deadlockCount,
+                "No MySQL deadlocks (error 1213) should occur."
+        );
+
+        // Invariant 1: each successful booking has the expected slots.
         int expectedNewSlots = 0;
 
         for (BookingResult booking : List.copyOf(createdBookings)) {
             long durationMinutes = Duration.between(
-                    booking.start(), booking.end()
+                    booking.start(),
+                    booking.end()
             ).toMinutes();
 
             int expectedSlots =
@@ -279,10 +308,29 @@ class BookingServiceStressTests {
         );
 
         assertEquals(
-                bookingsBefore + successes.get(),
+                bookingsBefore + successCount,
                 countBookingsOnTestDate(),
                 "Unexpected booking row count after the run."
         );
+    }
+
+    /*
+     * Detect MySQL deadlock error 1213, including when the SQLException
+     * is wrapped inside another exception.
+     */
+    private boolean isDeadlock(Throwable throwable) {
+        Throwable current = throwable;
+
+        while (current != null) {
+            if (current instanceof SQLException sqlException
+                    && sqlException.getErrorCode() == 1213) {
+                return true;
+            }
+
+            current = current.getCause();
+        }
+
+        return false;
     }
 
     private int countBookingsOnTestDate() throws SQLException {
@@ -297,10 +345,14 @@ class BookingServiceStressTests {
                      connection.prepareStatement(sql)) {
 
             statement.setTimestamp(
-                    1, java.sql.Timestamp.valueOf(TEST_DATE.atStartOfDay()));
+                    1,
+                    java.sql.Timestamp.valueOf(TEST_DATE.atStartOfDay())
+            );
             statement.setTimestamp(
-                    2, java.sql.Timestamp.valueOf(
-                            TEST_DATE.plusDays(1).atStartOfDay()));
+                    2,
+                    java.sql.Timestamp.valueOf(
+                            TEST_DATE.plusDays(1).atStartOfDay())
+            );
 
             try (ResultSet rs = statement.executeQuery()) {
                 rs.next();
@@ -321,10 +373,14 @@ class BookingServiceStressTests {
                      connection.prepareStatement(sql)) {
 
             statement.setTimestamp(
-                    1, java.sql.Timestamp.valueOf(TEST_DATE.atStartOfDay()));
+                    1,
+                    java.sql.Timestamp.valueOf(TEST_DATE.atStartOfDay())
+            );
             statement.setTimestamp(
-                    2, java.sql.Timestamp.valueOf(
-                            TEST_DATE.plusDays(1).atStartOfDay()));
+                    2,
+                    java.sql.Timestamp.valueOf(
+                            TEST_DATE.plusDays(1).atStartOfDay())
+            );
 
             try (ResultSet rs = statement.executeQuery()) {
                 rs.next();
@@ -374,10 +430,14 @@ class BookingServiceStressTests {
                      connection.prepareStatement(sql)) {
 
             statement.setTimestamp(
-                    1, java.sql.Timestamp.valueOf(TEST_DATE.atStartOfDay()));
+                    1,
+                    java.sql.Timestamp.valueOf(TEST_DATE.atStartOfDay())
+            );
             statement.setTimestamp(
-                    2, java.sql.Timestamp.valueOf(
-                            TEST_DATE.plusDays(1).atStartOfDay()));
+                    2,
+                    java.sql.Timestamp.valueOf(
+                            TEST_DATE.plusDays(1).atStartOfDay())
+            );
 
             try (ResultSet rs = statement.executeQuery()) {
                 rs.next();
@@ -402,10 +462,14 @@ class BookingServiceStressTests {
                      connection.prepareStatement(sql)) {
 
             statement.setTimestamp(
-                    1, java.sql.Timestamp.valueOf(TEST_DATE.atStartOfDay()));
+                    1,
+                    java.sql.Timestamp.valueOf(TEST_DATE.atStartOfDay())
+            );
             statement.setTimestamp(
-                    2, java.sql.Timestamp.valueOf(
-                            TEST_DATE.plusDays(1).atStartOfDay()));
+                    2,
+                    java.sql.Timestamp.valueOf(
+                            TEST_DATE.plusDays(1).atStartOfDay())
+            );
 
             try (ResultSet rs = statement.executeQuery()) {
                 rs.next();

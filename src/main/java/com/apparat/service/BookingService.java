@@ -116,38 +116,13 @@ public class BookingService {
             );
         }
 
-        // 2. Check that the resource exists and is ACTIVE.
+        // 2. Generate slots before opening the database connection.
+        List<LocalDateTime> slots = generateSlots(start, end);
+
+        // 3. Create DAO objects.
         ResourceDao resourceDao = new ResourceDao();
-
-        Optional<Resource> resourceOptional =
-                resourceDao.findById(resourceId);
-
-        if (resourceOptional.isEmpty()) {
-            throw new IllegalArgumentException(
-                    "Resource does not exist."
-            );
-        }
-
-        Resource resource = resourceOptional.get();
-
-        if (resource.getStatus() != ResourceStatus.ACTIVE) {
-            throw new IllegalStateException(
-                    "Resource is not active."
-            );
-        }
-
-        // 3. Create the booking and DAO objects.
         BookingDao bookingDao = new BookingDao();
         BookingSlotDao bookingSlotDao = new BookingSlotDao();
-
-        Booking booking = new Booking(
-                0,
-                userId,
-                resourceId,
-                start,
-                end,
-                BookingStatus.CONFIRMED
-        );
 
         // 4. Open one connection and begin the transaction.
         try (Connection connection =
@@ -156,14 +131,42 @@ public class BookingService {
             connection.setAutoCommit(false);
 
             try {
-                // 5. Insert the booking and retrieve its generated ID.
+                // 5. Lock the resource row and check its status.
+                Optional<Resource> resourceOptional =
+                        resourceDao.findByIdForUpdate(
+                                connection,
+                                resourceId
+                        );
+
+                if (resourceOptional.isEmpty()) {
+                    throw new IllegalArgumentException(
+                            "Resource does not exist."
+                    );
+                }
+
+                Resource resource = resourceOptional.get();
+
+                if (resource.getStatus() != ResourceStatus.ACTIVE) {
+                    throw new IllegalStateException(
+                            "Resource is not active."
+                    );
+                }
+
+                // 6. Create the booking.
+                Booking booking = new Booking(
+                        0,
+                        userId,
+                        resourceId,
+                        start,
+                        end,
+                        BookingStatus.CONFIRMED
+                );
+
+                // 7. Insert the booking and retrieve its generated ID.
                 Booking savedBooking =
                         bookingDao.insert(connection, booking);
 
-                // 6. Generate slots and insert them.
-                List<LocalDateTime> slots =
-                        generateSlots(start, end);
-
+                // 8. Insert all requested booking slots.
                 for (LocalDateTime slotStart : slots) {
                     try {
                         bookingSlotDao.insert(
@@ -185,13 +188,13 @@ public class BookingService {
                     }
                 }
 
-                // 7. Commit only when every insert succeeds.
+                // 9. Commit only when every insert succeeds.
                 connection.commit();
 
                 return savedBooking;
 
             } catch (SQLException | RuntimeException e) {
-                // Preserve the original error if rollback also fails.
+                // Roll back every change if the transaction fails.
                 try {
                     connection.rollback();
                 } catch (SQLException rollbackException) {
