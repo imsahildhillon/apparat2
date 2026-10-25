@@ -1,3 +1,4 @@
+
 package com.apparat.config;
 
 import java.sql.Connection;
@@ -13,6 +14,15 @@ public class DatabaseConnection {
     private static final String PASSWORD = "";
 
     public static Connection getConnection() throws SQLException {
+        try {
+            Class.forName("com.mysql.cj.jdbc.Driver");
+        } catch (ClassNotFoundException e) {
+            throw new SQLException(
+                    "MySQL JDBC driver could not be loaded.",
+                    e
+            );
+        }
+
         return DriverManager.getConnection(URL, USER, PASSWORD);
     }
 }
