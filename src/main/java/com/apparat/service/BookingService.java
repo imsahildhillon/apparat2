@@ -11,11 +11,13 @@ import com.apparat.config.DatabaseConnection;
 import com.apparat.dao.BookingDao;
 import com.apparat.dao.BookingSlotDao;
 import com.apparat.dao.ResourceDao;
+import com.apparat.dto.BookingView;
 import com.apparat.model.Booking;
 import com.apparat.model.BookingStatus;
 import com.apparat.model.Resource;
 import com.apparat.model.ResourceStatus;
 import com.apparat.service.SlotConflictException;
+
 
 import java.sql.Connection;
 import java.sql.SQLException;
@@ -28,6 +30,8 @@ public class BookingService {
     public static final LocalTime OPEN = LocalTime.of(9, 0);
     public static final LocalTime CLOSE = LocalTime.of(18, 0);
     public static final int SLOT_MINUTES = 30;
+
+    private final BookingDao bookingDao = new BookingDao();
 
     public boolean isValidRange(LocalDateTime start, LocalDateTime end) {
 
@@ -205,5 +209,72 @@ public class BookingService {
             }
         }
     }
+    public List<BookingView> listBookings(int userId)
+            throws SQLException {
+
+        return bookingDao.findByUserId(userId);
+    }
+
+    public void cancelBooking(int bookingId, int userId)
+            throws SQLException {
+
+        try (Connection connection =
+                     DatabaseConnection.getConnection()) {
+
+            connection.setAutoCommit(false);
+
+            try {
+                // Lock the booking row before checking its state.
+                Optional<Booking> bookingOptional =
+                        bookingDao.findByIdForUpdate(
+                                connection, bookingId
+                        );
+
+                if (bookingOptional.isEmpty()) {
+                    throw new BookingNotFoundException(
+                            "Booking does not exist."
+                    );
+                }
+
+                Booking booking = bookingOptional.get();
+
+                // Enforce ownership in the service layer.
+                if (booking.getUserId() != userId) {
+                    throw new BookingOwnershipException(
+                            "You cannot cancel another user's booking."
+                    );
+                }
+
+                // Only confirmed bookings can be cancelled.
+                if (booking.getStatus() != BookingStatus.CONFIRMED) {
+                    throw new BookingStateException(
+                            "This booking is no longer active."
+                    );
+                }
+
+                // Both operations use this transaction's connection.
+                bookingDao.updateStatus(
+                        connection,
+                        bookingId,
+                        BookingStatus.CANCELLED
+                );
+
+                bookingDao.deleteSlots(connection, bookingId);
+
+                connection.commit();
+
+            } catch (SQLException | RuntimeException e) {
+                try {
+                    connection.rollback();
+                } catch (SQLException rollbackException) {
+                    e.addSuppressed(rollbackException);
+                }
+
+                throw e;
+            }
+        }
+    }
+
+
 
 }
