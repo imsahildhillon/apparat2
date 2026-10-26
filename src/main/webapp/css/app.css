@@ -1,0 +1,308 @@
+/*
+ * Shared styles. Rules are scoped to classes (.page, .nav, .card ...) so
+ * pages that already carry their own inline CSS are not affected.
+ */
+
+/* Baseline: the same margin and font on every page. */
+body {
+    margin: 0;
+    font-family: Arial, sans-serif;
+}
+
+.page {
+    font-family: Arial, sans-serif;
+    max-width: 960px;
+    margin: 0 auto 40px;
+    padding: 0 20px;
+    color: #1f2933;
+}
+
+.page table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 12px;
+}
+
+.page th, .page td {
+    border: 1px solid #ddd;
+    padding: 10px 12px;
+    text-align: left;
+}
+
+.page th {
+    background: #f2f2f2;
+}
+
+.nav {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px 16px;
+    padding: 12px 20px;
+    margin: 0 0 24px;
+    background: #14304a;
+    color: #fff;
+    font-family: Arial, sans-serif;
+}
+
+.nav a, .nav .link-button {
+    color: #fff;
+    text-decoration: none;
+    font-size: 14px;
+    background: none;
+    border: 0;
+    cursor: pointer;
+    padding: 0;
+}
+
+/* Page-level rules such as "button { width: 100% }" must not reach the nav. */
+.nav .link-button {
+    width: auto;
+    margin: 0;
+    box-sizing: content-box;
+    font-family: inherit;
+}
+
+.nav a:hover, .nav .link-button:hover {
+    text-decoration: underline;
+}
+
+.nav .brand {
+    font-weight: bold;
+    font-size: 18px;
+    margin-right: 10px;
+}
+
+.nav .spacer {
+    flex: 1;
+}
+
+.nav .who {
+    font-size: 13px;
+    opacity: 0.85;
+}
+
+.nav form {
+    margin: 0;
+}
+
+.card {
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    padding: 20px;
+    margin: 16px 0;
+    background: #fafafa;
+}
+
+.form-row {
+    margin-bottom: 14px;
+}
+
+.form-row label {
+    display: block;
+    font-weight: bold;
+    margin-bottom: 4px;
+}
+
+.form-row input, .form-row select {
+    box-sizing: border-box;
+    width: 100%;
+    padding: 9px;
+}
+
+.inline-form {
+    display: inline;
+}
+
+.btn {
+    background: #14304a;
+    color: #fff;
+    border: 0;
+    border-radius: 4px;
+    padding: 9px 16px;
+    cursor: pointer;
+    font-size: 14px;
+    text-decoration: none;
+    display: inline-block;
+}
+
+.btn:hover {
+    background: #0d2236;
+}
+
+.btn-danger {
+    background: #b42318;
+}
+
+.btn-small {
+    padding: 5px 10px;
+    font-size: 13px;
+}
+
+.alert {
+    padding: 12px;
+    margin: 14px 0;
+    border-radius: 4px;
+}
+
+.alert-error {
+    background: #fff0f0;
+    border: 1px solid #e0aaaa;
+}
+
+.alert-success {
+    background: #eaf7ea;
+    border: 1px solid #a5d6a7;
+    color: #216e39;
+}
+
+.alert-info {
+    background: #eef4fb;
+    border: 1px solid #b6cde8;
+}
+
+.slot-free {
+    background: #eaf7ea;
+    color: #216e39;
+}
+
+.slot-maint {
+    background: #fff4dc;
+    color: #8a5a00;
+}
+
+.slot-booked {
+    background: #fdecea;
+    color: #b42318;
+}
+
+.muted {
+    color: #6b7785;
+    font-size: 13px;
+}
+
+.login-box {
+    max-width: 380px;
+    margin: 60px auto;
+}
+
+.summary {
+    background: #eef4fb;
+    border: 1px solid #b6cde8;
+    border-radius: 4px;
+    padding: 10px 12px;
+    margin: 12px 0 16px;
+}
+
+.form-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0 16px;
+}
+
+@media (max-width: 600px) {
+    .form-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+.btn-light {
+    background: #e8eef4;
+    color: #14304a;
+    margin-left: 8px;
+}
+
+.btn-light:hover {
+    background: #d5dfe9;
+}
+
+/* ---- Home page ---- */
+.hero {
+    margin: 4px 0 18px;
+}
+
+.hero h1 {
+    margin-bottom: 8px;
+}
+
+.badge {
+    display: inline-block;
+    background: #14304a;
+    color: #fff;
+    border-radius: 999px;
+    padding: 3px 12px;
+    font-size: 13px;
+    margin-right: 8px;
+}
+
+.tiles {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+    gap: 14px;
+    margin: 18px 0;
+}
+
+.tile {
+    background: #f4f7fa;
+    border: 1px solid #dbe3ea;
+    border-radius: 6px;
+    padding: 14px 16px;
+}
+
+.tile-label {
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: #6b7785;
+}
+
+.tile-value {
+    font-size: 30px;
+    font-weight: bold;
+    color: #14304a;
+    margin-top: 4px;
+}
+
+.tile-text {
+    font-size: 17px;
+    font-weight: bold;
+    color: #14304a;
+    margin-top: 8px;
+}
+
+.tile-sub {
+    font-size: 13px;
+    color: #6b7785;
+    margin-top: 2px;
+}
+
+.tiles-small {
+    grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+    margin-top: 8px;
+}
+
+.actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin: 6px 0 22px;
+}
+
+.actions .btn-light {
+    margin-left: 0;
+}
+
+.plain-list {
+    margin: 8px 0;
+    padding-left: 18px;
+}
+
+.plain-list li {
+    margin-bottom: 6px;
+}
+
+/* A wide table scrolls inside its own box, never the whole page. */
+.table-wrap {
+    overflow-x: auto;
+    max-width: 100%;
+}
