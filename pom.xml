@@ -43,4 +43,21 @@
         </dependency>
     </dependencies>
 
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <version>3.5.4</version>
+                <configuration>
+                    <!-- Tests run against their own database, never the demo one. -->
+                    <systemPropertyVariables>
+                        <apparat.db.url>jdbc:mysql://127.0.0.1:3308/apparat2_test</apparat.db.url>
+                    </systemPropertyVariables>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
+
 </project>
