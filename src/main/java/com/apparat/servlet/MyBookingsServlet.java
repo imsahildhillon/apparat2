@@ -1,9 +1,9 @@
 package com.apparat.servlet;
 
+import com.apparat.dto.SessionUser;
 import com.apparat.service.BookingService;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.annotation.WebServlet;
-import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpSession;
@@ -12,7 +12,7 @@ import java.io.IOException;
 import java.sql.SQLException;
 
 @WebServlet("/bookings")
-public class MyBookingsServlet extends HttpServlet {
+public class MyBookingsServlet extends BaseServlet {
 
     private final BookingService bookingService = new BookingService();
 
@@ -21,8 +21,9 @@ public class MyBookingsServlet extends HttpServlet {
                          HttpServletResponse response)
             throws ServletException, IOException {
 
-        // TODO: Replace with the authenticated user's ID from the session.
-        int userId = 1;
+        // The logged-in user, put in the session by LoginServlet.
+        SessionUser sessionUser = currentUser(request);
+        int userId = sessionUser.id();
 
         // Retrieve and consume the one-time flash message.
         HttpSession session = request.getSession(false);

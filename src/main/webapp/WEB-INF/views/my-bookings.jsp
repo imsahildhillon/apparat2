@@ -5,14 +5,9 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
+  <link rel="stylesheet" href="${pageContext.request.contextPath}/css/app.css">
   <title>My Bookings | Apparat</title>
   <style>
-    body {
-      font-family: Arial, sans-serif;
-      max-width: 1000px;
-      margin: 40px auto;
-      padding: 0 20px;
-    }
 
     table {
       width: 100%;
@@ -46,6 +41,8 @@
   </style>
 </head>
 <body>
+<jsp:include page="/WEB-INF/views/fragments/nav.jsp" />
+<div class="page">
 
 <h1>My Bookings</h1>
 
@@ -60,6 +57,8 @@
     Browse instruments
   </a>
 </p>
+
+<div class="table-wrap">
 
 <table>
   <thead>
@@ -110,6 +109,8 @@
   </c:if>
   </tbody>
 </table>
+</div>
 
+</div>
 </body>
 </html>

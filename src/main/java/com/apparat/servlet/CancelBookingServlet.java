@@ -1,5 +1,6 @@
 package com.apparat.servlet;
 
+import com.apparat.dto.SessionUser;
 import com.apparat.service.BookingNotFoundException;
 import com.apparat.service.BookingOwnershipException;
 import com.apparat.service.BookingService;
@@ -7,7 +8,6 @@ import com.apparat.service.BookingStateException;
 
 import jakarta.servlet.ServletException;
 import jakarta.servlet.annotation.WebServlet;
-import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 
@@ -15,7 +15,7 @@ import java.io.IOException;
 import java.sql.SQLException;
 
 @WebServlet("/cancel")
-public class CancelBookingServlet extends HttpServlet {
+public class CancelBookingServlet extends BaseServlet {
 
     private final BookingService bookingService = new BookingService();
 
@@ -24,8 +24,9 @@ public class CancelBookingServlet extends HttpServlet {
                           HttpServletResponse response)
             throws ServletException, IOException {
 
-        // TODO: Replace with the authenticated user's ID from the session.
-        int userId = 1;
+        // The logged-in user, put in the session by LoginServlet.
+        SessionUser sessionUser = currentUser(request);
+        int userId = sessionUser.id();
 
         String rawBookingId = request.getParameter("bookingId");
 

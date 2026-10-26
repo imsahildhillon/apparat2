@@ -9,13 +9,18 @@ import java.util.List;
 
 import com.apparat.config.DatabaseConnection;
 import com.apparat.dao.BookingDao;
+import com.apparat.dao.BookingCountDao;
 import com.apparat.dao.BookingSlotDao;
+import com.apparat.dao.MaintenanceDao;
 import com.apparat.dao.ResourceDao;
+import com.apparat.dao.UserDao;
 import com.apparat.dto.BookingView;
 import com.apparat.model.Booking;
 import com.apparat.model.BookingStatus;
 import com.apparat.model.Resource;
 import com.apparat.model.ResourceStatus;
+import com.apparat.model.Role;
+import com.apparat.policy.BookingPolicy;
 import com.apparat.service.SlotConflictException;
 
 
@@ -32,49 +37,70 @@ public class BookingService {
     public static final int SLOT_MINUTES = 30;
 
     private final BookingDao bookingDao = new BookingDao();
+    private final MaintenanceDao maintenanceDao = new MaintenanceDao();
+    private final UserDao userDao = new UserDao();
+    private final BookingCountDao bookingCountDao = new BookingCountDao();
 
     public boolean isValidRange(LocalDateTime start, LocalDateTime end) {
+        return findRangeError(start, end).isEmpty();
+    }
+
+    /**
+     * Says which rule a booking time range breaks, in plain words,
+     * or returns empty when the range is fine. isValidRange uses this too,
+     * so the rules exist in one place only.
+     */
+    public Optional<String> findRangeError(
+            LocalDateTime start,
+            LocalDateTime end
+    ) {
 
         // 1. Start and end must not be null
         if (start == null || end == null) {
-            return false;
+            return Optional.of("Please choose a start time and an end time.");
         }
 
         // 2. Start time must be before end time
         if (!start.isBefore(end)) {
-            return false;
+            return Optional.of("The end time must be after the start time.");
         }
 
         // 3. Booking duration must be at least 30 minutes
         Duration duration = Duration.between(start, end);
 
         if (duration.toMinutes() < SLOT_MINUTES) {
-            return false;
+            return Optional.of(
+                    "A booking must be at least "
+                            + SLOT_MINUTES + " minutes long."
+            );
         }
 
         // 4. Booking must be on the same day
         if (!start.toLocalDate().equals(end.toLocalDate())) {
-            return false;
+            return Optional.of("A booking must start and end on the same day.");
         }
 
         // 5. Start and end must align with 30-minute boundaries
         if (!isSlotBoundary(start.toLocalTime())
                 || !isSlotBoundary(end.toLocalTime())) {
-            return false;
+            return Optional.of(
+                    "Bookings must start and end on the hour or half hour, "
+                            + "for example 10:00 or 10:30."
+            );
         }
 
         // 6. Booking must fall within operating hours
         if (start.toLocalTime().isBefore(OPEN)
-                || !start.toLocalTime().isBefore(CLOSE)) {
-            return false;
-        }
-
-        if (end.toLocalTime().isBefore(OPEN)
+                || !start.toLocalTime().isBefore(CLOSE)
+                || end.toLocalTime().isBefore(OPEN)
                 || end.toLocalTime().isAfter(CLOSE)) {
-            return false;
+            return Optional.of(
+                    "The lab is open from " + OPEN + " to " + CLOSE
+                            + ". Please choose a time within these hours."
+            );
         }
 
-        return true;
+        return Optional.empty();
     }
 
     private boolean isSlotBoundary(LocalTime time) {
@@ -87,10 +113,10 @@ public class BookingService {
             LocalDateTime start,
             LocalDateTime end) {
 
-        if (!isValidRange(start, end)) {
-            throw new IllegalArgumentException(
-                    "Invalid booking time range."
-            );
+        Optional<String> rangeError = findRangeError(start, end);
+
+        if (rangeError.isPresent()) {
+            throw new IllegalArgumentException(rangeError.get());
         }
 
         List<LocalDateTime> slots = new ArrayList<>();
@@ -114,10 +140,10 @@ public class BookingService {
     ) throws SQLException {
 
         // 1. Validate the booking time range.
-        if (!isValidRange(start, end)) {
-            throw new IllegalArgumentException(
-                    "Invalid booking time range."
-            );
+        Optional<String> rangeError = findRangeError(start, end);
+
+        if (rangeError.isPresent()) {
+            throw new IllegalArgumentException(rangeError.get());
         }
 
         // 2. Generate slots before opening the database connection.
@@ -144,7 +170,7 @@ public class BookingService {
 
                 if (resourceOptional.isEmpty()) {
                     throw new IllegalArgumentException(
-                            "Resource does not exist."
+                            "That instrument does not exist."
                     );
                 }
 
@@ -152,8 +178,41 @@ public class BookingService {
 
                 if (resource.getStatus() != ResourceStatus.ACTIVE) {
                     throw new IllegalStateException(
-                            "Resource is not active."
+                            "This instrument is not available for booking right now."
                     );
+                }
+
+                // Maintenance windows block bookings. The instrument row is
+                // already locked, so no window can be added while we check.
+                if (maintenanceDao.existsOverlapping(
+                        connection, resourceId, start, end)) {
+                    throw new MaintenanceConflictException(
+                            "The instrument is under maintenance at that time."
+                    );
+                }
+
+                // Limits for this user's role. The user row is locked first,
+                // so two bookings by the same person cannot both pass the
+                // "active bookings" count at the same moment.
+                Optional<Role> role =
+                        userDao.findRoleForUpdate(connection, userId);
+
+                if (role.isEmpty()) {
+                    throw new IllegalArgumentException(
+                            "That user does not exist."
+                    );
+                }
+
+                int activeBookings = bookingCountDao.countActiveByUser(
+                        connection, userId, LocalDateTime.now()
+                );
+
+                Optional<String> limitError = BookingPolicy
+                        .forRole(role.get())
+                        .check(start, end, activeBookings);
+
+                if (limitError.isPresent()) {
+                    throw new BookingLimitException(limitError.get());
                 }
 
                 // 6. Create the booking.

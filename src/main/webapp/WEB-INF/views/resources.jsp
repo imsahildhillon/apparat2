@@ -13,14 +13,9 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
+    <link rel="stylesheet" href="${pageContext.request.contextPath}/css/app.css">
     <title>Available Instruments | Apparat</title>
     <style>
-        body {
-            font-family: Arial, sans-serif;
-            max-width: 900px;
-            margin: 40px auto;
-            padding: 0 20px;
-        }
 
         table {
             width: 100%;
@@ -57,6 +52,8 @@
     </style>
 </head>
 <body>
+<jsp:include page="/WEB-INF/views/fragments/nav.jsp" />
+<div class="page">
 
 <h1>Available Instruments</h1>
 
@@ -71,6 +68,8 @@
         Book an instrument
     </a>
 </p>
+
+<div class="table-wrap">
 
 <table>
     <thead>
@@ -109,6 +108,8 @@
     </c:if>
     </tbody>
 </table>
+</div>
 
+</div>
 </body>
 </html>
